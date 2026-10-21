@@ -1560,6 +1560,12 @@ impl Escrow {
             return Err(ContractError::ConflictingRoles);
         }
 
+        // Expiry: PendingExpiry schedule + blanket PENDING_EXPIRY_WINDOW,
+        // shared with fund_escrow via the internal::ensure_funding_not_expired
+        // helper (Issue #1156). Without this, basket escrows could be funded
+        // after the pending window expired.
+        crate::internal::ensure_funding_not_expired(&env, escrow_id)?;
+
         if let Some(ref expected_buyer) = escrow.buyer {
             if &buyer != expected_buyer {
                 return Err(ContractError::NotAuthorizedBuyer);
