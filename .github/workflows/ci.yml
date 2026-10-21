@@ -20,6 +20,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Format Check
         run: make fmt-check
+      - name: Documentation Link Check
+        run: make docs-link-check
       # Canonical lint scope — identical to the pre-commit hook (issue #1102).
       - name: Audit Scope Drift Check
         run: |

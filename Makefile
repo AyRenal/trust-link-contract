@@ -1,4 +1,4 @@
-.PHONY: help build build-wasm test test-all fmt clippy bench clean check check-error-codes doc audit indexer-test xtask-test \
+.PHONY: help build build-wasm test test-all fmt clippy bench clean check check-error-codes docs-link-check doc audit indexer-test xtask-test \
 	testnet testnet-reset testnet-stop fuzz-build fuzz fuzz-check setup hooks-uninstall
 
 help: ## Show this help
@@ -45,7 +45,7 @@ CLIPPY_PEDANTIC_ALLOW := \
 clippy: ## Run clippy lints, including clippy::pedantic (canonical scope, used by hook and CI)
 	cargo clippy --lib -- -D warnings -W clippy::pedantic $(CLIPPY_PEDANTIC_ALLOW)
 
-check: fmt-check clippy test check-error-codes ## Run all checks (fmt + clippy + test + error-code drift)
+check: fmt-check clippy test check-error-codes docs-link-check ## Run all checks (fmt + clippy + test + error-code drift + required docs links)
 
 bench: ## Run benchmarks (if available)
 	cargo test --release -- --ignored
@@ -67,6 +67,9 @@ clean: ## Clean build artifacts
 
 check-error-codes: ## Verify errors.rs and bindings/src/errors.ts agree
 	node scripts/check-error-codes.mjs
+
+docs-link-check: ## Verify required resolver documentation links
+	node scripts/check-resolver-links.mjs
 
 doc: ## Generate and open documentation
 	cargo doc --open
