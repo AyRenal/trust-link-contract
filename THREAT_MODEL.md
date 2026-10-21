@@ -296,18 +296,18 @@ proof.
 - Unintended fee change executed without original proposer's involvement
 
 **Mitigation**:
-- ✅ `execute_timelock_op` requires `caller == proposal.proposer` (see `admin.rs:65-90`)
-- ✅ Only the original proposer can execute their own queued operation
-- ✅ New admin cannot execute old admin's proposals
-- ✅ New admin must queue their own proposal and wait the full timelock delay
-- ✅ If admin role is rotated, pending proposals are orphaned; only original admin can execute
+- ✅ `execute_timelock_op` requires the supplied `caller` value to equal `proposal.proposer` (see `admin.rs:65-99`)
+- ✅ **Execution itself is permissionless** — `execute_timelock_op` never calls `caller.require_auth()`. Anyone (a keeper, a bot, a cron job) can submit the `execute_<operation>` transaction after `ready_at`, as long as they pass the correct `proposer` address as the `caller` argument; no signature from the proposer is required. `proposer` is public (readable via storage and the `TimelockQueued` event), so this is a value check gating *which proposal slot* gets finalized, not an authorization check on *who* finalizes it.
+- ✅ That value check still means a *different admin's* own distinct proposal can't be executed in this one's slot
+- ✅ New admin must queue their own proposal and wait the full timelock delay to make their own change
+- ✅ If admin role is rotated, pending proposals are orphaned (the new admin can't make the old proposal apply to them), but anyone can still trigger its execution if desired — there's nothing to "protect" by blocking that, since the operation and params were already fixed and hashed at queue time
 
 **Permission Model**:
-- `queue_<operation>`: Callable by current admin; creates a proposal with proposer = caller
-- `execute_<operation>`: Callable by original proposer only after delay; reverts if caller ≠ proposer
-- `cancel_timelock_op`: Callable by current admin; bypasses proposer check to allow cancellation of orphaned proposals
+- `queue_<operation>`: Callable by current admin only; creates a proposal with proposer = caller
+- `execute_<operation>`: **Callable by anyone**, after `ready_at`, provided the `caller` argument supplied matches the stored `proposal.proposer` value — this is permissionless keeper execution, not an admin-only or proposer-only auth gate
+- `cancel_timelock_op`: Callable by current admin only; requires `caller.require_auth()` plus `caller == admin`
 
-**Residual Risk**: Very Low. Proposer check enforced at execute time.
+**Residual Risk**: Very Low. The proposer-value check and params hash together ensure only the exact queued operation can be finalized, by whoever submits it.
 
 ---
 
