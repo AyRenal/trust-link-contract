@@ -237,12 +237,12 @@ proof.
 - Funds stuck in contract
 
 **Mitigation**:
-- ✅ Fee cap enforced: max 1000 BPS (10%) on initialization
-- ✅ Arbitration fee capped at 1000 BPS per-escrow
-- ✅ Even with max fees: payout = 100 - 10 - ~0.1 = ~89.9 (positive)
+- ✅ Arbitration fee alone is capped at `MAX_ARBITRATION_FEE_BPS` = 500 BPS (5%) — [`ArbitrationFeeExceedsMax` (59)](ERROR_CODES.md)
+- ✅ Protocol + arbitration fees combined are capped at `MAX_COMBINED_FEE_BPS` = 1,000 BPS (10%) — [`FeeExceedsMax` (7)](ERROR_CODES.md)
+- ✅ Even with max fees: payout = 100 - 5 - ~0.5 = ~94.5 (positive)
 - ✅ Fee configuration immutable per-escrow once created
 
-**Residual Risk**: Very Low. Fee caps are hard-coded.
+**Residual Risk**: Very Low. Fee caps are hard-coded (`contracts/escrow/src/lib.rs` — `MAX_ARBITRATION_FEE_BPS`, `MAX_COMBINED_FEE_BPS`).
 
 ---
 
