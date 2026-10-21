@@ -12,6 +12,7 @@ the create-escrow flow end to end and links out to it for everything else.
 - [Creating an escrow](#creating-an-escrow)
 - [Reading basket tokens](#reading-basket-tokens)
 - [Funding and progressing an escrow](#funding-and-progressing-an-escrow)
+- [Reading message pages](#reading-message-pages)
 - [Listening for events](#listening-for-events)
 - [Error handling](#error-handling)
 - [Testing on testnet](#testing-on-testnet)
@@ -154,6 +155,33 @@ await client.confirm_delivery(buyerAddress, escrowId);
 const escrow = await client.get_escrow(escrowId);
 console.log(escrow.state); // e.g. "Completed"
 ```
+
+## Reading message pages
+
+`get_messages(escrowId, start, limit)` uses a zero-based `start` offset and
+returns messages in insertion order. The contract silently clamps any limit
+above `MAX_MESSAGES_PER_PAGE` (currently 50), so `limit = 1000` still returns
+at most 50 messages per page. Advance `start` by the number of messages that
+was actually returned:
+
+```ts
+const messages = [];
+let start = 0n;
+
+while (true) {
+  // A request for 1000 is safe, but the contract returns at most 50 here.
+  const page = await client.get_messages(escrowId, start, 1000n);
+  messages.push(...page);
+
+  if (page.length < 50) {
+    break; // The final page was shorter than the contract maximum.
+  }
+  start += BigInt(page.length);
+}
+```
+
+Use the returned page length rather than adding the requested `limit`: a
+request for 1000 does not create a 1000-message page.
 
 The full lifecycle (dispute raising/resolution, refunds, cancellation,
 auto-release, message threads) is documented method-by-method in

@@ -65,8 +65,11 @@ TrustLink is a three-party escrow contract with seller, buyer, and resolver role
 **Mitigation**:
 - ✅ Fee calculation uses `checked_mul` / `checked_div` in helpers
 - ✅ Overflow returns `ArithmeticError`
-- ✅ Fee cap: max 1000 BPS (10%) enforced on initialization
-- ✅ Arbitration fee capped per-escrow at creation
+- ✅ Per-escrow fee and resolver-fee validation returns [`FeeExceedsMax` (7)](ERROR_CODES.md)
+- ✅ Platform-fee validation returns [`PlatformFeeExceedsMax` (32)](ERROR_CODES.md)
+- ✅ Protocol-fee validation returns [`ProtocolFeeExceedsMax` (58)](ERROR_CODES.md)
+- ✅ Arbitration fee has its separate cap and error code [`ArbitrationFeeExceedsMax` (59)](ERROR_CODES.md)
+- ✅ The protocol and arbitration fee settings also share a combined cap
 - ✅ Amounts validated > 0 at creation
 
 **Residual Risk**: Very Low. Checked arithmetic throughout.

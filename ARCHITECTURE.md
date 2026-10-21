@@ -175,12 +175,12 @@ An escrow's dispute resolver is not always a single address. `EscrowData.resolve
 
 For all three variants, the same entry points are used to resolve a dispute:
 
-- `resolve_dispute(escrow_id, resolution)` or `vote(escrow_id, resolution)` — either name may be used; both call into the same voting logic. The caller must be a member of the escrow's `ResolverSet` (checked via `ResolverSet::contains`).
+- `resolve_dispute(escrow_id, resolution)` or `vote(escrow_id, resolution)` — either name may be used; both call into the same voting logic. The caller must be authorized by the escrow's `ResolverSet`; fallback authorization uses `can_resolve_now` so the backup is gated by its deadline.
 - Each call records or overwrites that resolver's vote (`ResolverVote { resolver, resolution, voted_at }`) — a resolver changing their mind simply votes again.
 - Votes are tallied separately per `ResolutionType` (`Release` vs `Refund`). Once either tally reaches `ResolverSet::threshold()`, the resolution executes automatically in the same transaction and the escrow moves to `PendingFinalization` (see [Appeal Flow](#appeal-flow)) — no separate "finalize the vote" step is needed to reach that state.
 - Full vote history for an escrow is queryable via `get_resolver_votes(escrow_id) -> Vec<ResolverVote>`.
 
-For `Single` and `Fallback` sets the threshold is 1, so the first vote from an authorized resolver resolves the dispute immediately. For `Fallback` sets specifically, **both** `primary` and `backup` are authorized to vote at any time — `dispute_deadline` is stored on `FallbackResolver` for off-chain/indexer reference but is not currently read by `contains`/`threshold`, so the contract does not itself gate backup takeover to after that deadline.
+For `Single` and `Fallback` sets the threshold is 1, so the first vote from an authorized resolver resolves the dispute. For `Fallback` sets specifically, the primary is always authorized, while the backup is authorized only when `ledger.timestamp() >= dispute_deadline`; the deadline is an absolute timestamp checked at call time.
 
 Multi-resolver escrows also support an **approved resolver registry**, managed by the admin:
 
@@ -223,7 +223,9 @@ Key rules (`finalize_dispute` / `appeal_dispute` in `lib.rs`):
 - `finalize_dispute` reverts with `AppealWindowActive` if called before `appeal_deadline`. It is permissionless (any caller may trigger it) once the window has elapsed, and pays out the previously-recorded resolution (minus platform and protocol fees) to the seller (`Release`) or buyer (`Refund`).
 - `appeal_dispute` reverts with `NotPendingFinalization` if the escrow isn't in `PendingFinalization`, and with `DisputeWindowStillOpen` if called after `appeal_deadline`. Only the escrow's buyer or (first) seller payee may call it.
 - A successful appeal clears the stored resolution and, for `Multi` resolver sets, deletes all recorded votes — resolvers must vote again from a clean slate. `DisputeData.appeal_count` is incremented so the number of appeal rounds is queryable via `get_dispute`.
-- There is no cap on the number of appeal rounds; the same window and rules apply to every round.
+- Appeals are limited by the admin-configured maximum (`MAX_APPEALS`, default 3;
+  configurable within the contract's allowed 1–10 range). Each permitted appeal
+  uses the same window and rules, and a new resolution starts a fresh round.
 
 ---
 
@@ -408,7 +410,7 @@ if *caller != proposal.proposer {
 | `fund_escrow` / `fund_basket_escrow` | `buyer` |
 | `confirm_delivery` | `buyer` (retrieved from stored `EscrowData`) |
 | `raise_dispute` | `buyer` (retrieved from stored `EscrowData`) |
-| `resolve_dispute` / `vote` | caller must be a member of `EscrowData.resolvers` (any resolver for `Multi`, either address for `Fallback`, the single resolver for `Single`) |
+| `resolve_dispute` / `vote` | caller must be authorized by `EscrowData.resolvers` (any resolver for `Multi`, primary always or backup at/after its fallback deadline for `Fallback`, the single resolver for `Single`) |
 | `finalize_dispute` | No auth restriction beyond signing the transaction — permissionless once the appeal window has elapsed |
 | `appeal_dispute` | `buyer` or the first `payees` entry (seller), retrieved from stored `EscrowData` |
 | `add_approved_resolver` / `remove_approved_resolver` / `set_resolver_strict` | `admin` |
