@@ -297,6 +297,7 @@ if escrow.state != EscrowState::Funded {
 - For `Option<T>` with a reasonable default: use `.unwrap_or()` or `.unwrap_or_else()`.
 
 **Enforcement:**
+Non-test contract code enforces this via `#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic))]` at the crate root. CI enforces this on every commit via `make clippy` — any use of these patterns in non-test code will fail the build.
 The canonical `make clippy` gate includes `clippy::unwrap_used`, `clippy::expect_used`, and `clippy::panic` lints at warning level, surfaced as hard errors by the `-D warnings` flag (see `CLIPPY_PANIC_FREE` in the `Makefile`). CI and the pre-commit hook both run `make clippy`, so any new `unwrap()`, `expect()`, or `panic!()` in non-test code fails the build before it merges.
 
 (`clippy::unwrap_used` is used rather than the narrower `clippy::unwrap_in_result` — the latter only fires on `Result::unwrap()` calls inside a function that itself returns `Result`, and silently misses `Option::unwrap()` entirely.)
@@ -358,7 +359,7 @@ make check
 - **Tests:** `make test` for the fast unit-only loop; `make test-all` runs every test target (unit + integration) and is what CI enforces before merge. The integration tests in `contracts/escrow/tests/` declare `required-features = ["testutils"]` in `contracts/escrow/Cargo.toml`, so bare `cargo test --tests` **skips** them with a note instead of failing — pass the feature (or use `make test-all`) to run them.
 - **End-to-End Tests (`make e2e`):** The repository provides shell-based end-to-end scripts in `e2e/` (`01_setup_and_deploy.sh` through `04_cancel_path.sh`). These scripts execute against a live Stellar network (requiring the `stellar` CLI, `jq`, and either `make testnet` or public testnet). `make e2e` is **excluded from CI** because public testnet / Friendbot introduces rate limits and network flakiness, while local devnet containers introduce heavy CI spin-up latency. Instead, full multi-step protocol flows are deterministically covered in CI by `make test-all` (`contracts/escrow/tests/*`). Contributors can run `make e2e` locally against devnet or testnet.
 
-These checks — `fmt`, `clippy`, `test`, `test-all`, `fuzz-check`, `xtask-test`, `indexer-test`, and `build-wasm` — are exactly what the CI pipeline runs, so running them locally before pushing means no CI surprises. The lib-target build/test commands work on any platform (Windows, Linux, macOS).
+These checks — `fmt`, `clippy`, `test`, `test-all`, `fuzz-check`, `xtask-test`, `indexer-test`, `snapshot-drift`, and `build-wasm` — are exactly what the CI pipeline runs, so running them locally before pushing means no CI surprises. The lib-target build/test commands work on any platform (Windows, Linux, macOS).
 
 ---
 
@@ -570,8 +571,9 @@ snapshots no longer reflect the code and the PR's snapshot diff reveals the
 drift. Always regenerate snapshots in the same PR that changes behaviour, and
 review the diff — an unexpected snapshot change often means an accidental
 behaviour change. CI treats the committed snapshots as the source of truth:
-stale or omitted snapshots are caught when the regenerated output differs from
-what is committed.
+stale or omitted snapshots are caught by the [`snapshot-drift`](.github/workflows/ci.yml)
+CI job when the regenerated output differs from what is committed under
+`contracts/escrow/test_snapshots/`.
 
 **No Git LFS required.** Snapshots are plain, human-readable JSON text files
 (a few tens of kilobytes). Commit them with normal `git add`; do **not** route
